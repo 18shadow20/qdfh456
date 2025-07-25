@@ -1,10 +1,9 @@
 import json
-from datetime import datetime
-
 from django.shortcuts import render
 from django.contrib import messages
 from .models import Record
 from .forms import JsloadForm
+from .utils import validate_json_record
 
 def upload_json(request):
     if request.method == 'POST':
@@ -18,26 +17,12 @@ def upload_json(request):
                 return render(request, 'loader/loader.html', {'form':form})
 
             valid_records = []
-
-            for i in data:
-                name = i.get('name')
-                date_str = i.get('date')
-
-                if not name or not date_str:
-                    messages.error(request, "Отсутствует нужный ключ")
-                    return render(request, 'loader/loader.html', {'form':form})
-
-                if len(name) >= 50:
-                    messages.error(request,'Поле слишком длинное')
-                    return render(request, 'loader/loader.html', {'form':form})
-
-                try:
-                    date = datetime.strptime(i['date'], "%Y-%m-%d_%H:%M")
-                except ValueError:
-                    messages.error(request,'Неверный формат даты')
-                    return render(request, 'loader/loader.html', {'form':form})
-
-                valid_records.append(Record(name=name,date=date))
+            for record in data:
+                is_valid, result = validate_json_record(record)
+                if not is_valid:
+                    messages.error(request, result)
+                    return render(request, 'loader/loader.html', {'form': form})
+                valid_records.append(result)
 
             Record.objects.bulk_create(valid_records)
 
